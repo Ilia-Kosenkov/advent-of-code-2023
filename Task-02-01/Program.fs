@@ -2,15 +2,15 @@
 
 let hasEnough required recorded =
     match recorded with
-    | Some has -> has >= required
-    | None -> false
+    | Some has -> has <= required
+    | None -> true
 
 type GameSet =
     { RedCount: int option
       GreenCount: int option
       BlueCount: int option }
 
-    member this.HasEnoughRed(required: int) = hasEnough required, this.RedCount
+    member this.HasEnoughRed(required: int) = hasEnough required this.RedCount
 
     member this.HasEnoughGreen(required: int) = hasEnough required this.GreenCount
 
@@ -88,6 +88,26 @@ let parseGame (line: string) =
                   GameSets = sets |> Array.ofList }
         | _ -> None
 
+let matchGame (game: Game) (requiredRed: int) (requiredGreen: int) (requiredBlue: int) =
+    if
+        Array.TrueForAll(
+            game.GameSets,
+            (fun gameSet ->
+                (gameSet.HasEnoughRed requiredRed)
+                && (gameSet.HasEnoughGreen requiredGreen)
+                && (gameSet.HasEnoughBlue requiredBlue))
+        )
+    then
+        Some(game.Id)
+    else
+        None
+
 Environment.GetCommandLineArgs().[1].Split(Environment.NewLine, splitOptions)
-|> Array.map parseGame
-|> Array.iter (printfn "%A")
+|> Seq.fold
+    (fun list line ->
+        match (list, parseGame line) with
+        | (Some list, Some game) -> Some(List.append list [ game ])
+        | _ -> None)
+    (Some([]))
+|> Option.map (List.choose (fun game -> matchGame game 12 13 14))
+|> printfn "%A"
