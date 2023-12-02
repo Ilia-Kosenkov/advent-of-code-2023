@@ -110,4 +110,5 @@ Environment.GetCommandLineArgs().[1].Split(Environment.NewLine, splitOptions)
         | _ -> None)
     (Some([]))
 |> Option.map (List.choose (fun game -> matchGame game 12 13 14))
+|> Option.map List.sum
 |> printfn "%A"
