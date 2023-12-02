@@ -15,15 +15,13 @@ let extractDigitCharacters line =
     | _ -> None
 
 
+let parseInt (c: char) = c |> string |> int
+
 let parseDigits pairOpt =
-    match pairOpt with
-    | Some(f, l) -> Some(f |> string |> int, l |> string |> int)
-    | _ -> None
+    pairOpt |> Option.map (fun (f, l) -> (parseInt f, parseInt l))
 
 let constructNumber pairOpt =
-    match pairOpt with
-    | Some(f, l) -> Some(f * 10 + l)
-    | _ -> None
+    pairOpt |> Option.map (fun (f, l) -> f * 10 + l)
 
 Environment.GetCommandLineArgs().[1].Split(Environment.NewLine)
 |> Seq.map extractDigitCharacters
