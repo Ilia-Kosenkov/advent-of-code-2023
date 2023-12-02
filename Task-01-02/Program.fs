@@ -1,34 +1,45 @@
 ﻿open System
-open System.Text.RegularExpressions
-let digitRegex = Regex("\\d|one|two|three|four|five|six|seven|eight|nine", RegexOptions.Compiled ||| RegexOptions.NonBacktracking)
 
+// Match possible digit representation to digit
+let getDigitWhenNotEmpty (subString : ReadOnlySpan<char>) =
+    let firstDigit = int subString[0]
+    if firstDigit >= int '0' && firstDigit <= int '9' then Some(firstDigit - int '0')
+    elif subString.StartsWith("one") then Some(1)
+    elif subString.StartsWith("two") then Some(2)
+    elif subString.StartsWith("three") then Some(3)
+    elif subString.StartsWith("four") then Some(4)
+    elif subString.StartsWith("five") then Some(5)
+    elif subString.StartsWith("six") then Some(6)
+    elif subString.StartsWith("seven") then Some(7)
+    elif subString.StartsWith("eight") then Some(8)
+    elif subString.StartsWith("nine") then Some(9)
+    else None
+        
 
-let extractDigitCharacters line =
-    let matches = line |> digitRegex.Matches
-    match matches.Count with
-    | 0 -> None
-    | n -> Some(matches[0].Value, matches[n-1].Value)
+// Check string starting at `index` for digit representation
+let getDigit (wholeString : string) (index : int) =
+    let subString = wholeString.AsSpan(index)
+    if subString.IsEmpty then None
+    else getDigitWhenNotEmpty subString
 
+// Look for the first occurence of digit representation in a string,
+// slicing using offsets from sequence
+let findFirstDigit (wholeString : string) (sequence : int seq) =
+    sequence
+        |> Seq.choose (getDigit wholeString)
+        |> Seq.tryHead
 
-let parseInt (matchedString: string) =
-    match matchedString with
-        | "1" | "one" -> Some 1
-        | "2" | "two" -> Some 2
-        | "3" | "three" -> Some 3
-        | "4" | "four" -> Some 4
-        | "5" | "five" -> Some 5
-        | "6" | "six" -> Some 6
-        | "7" | "seven" -> Some 7
-        | "8" | "eight" -> Some 8
-        | "9" | "nine" -> Some 9
-        | "0" -> Some 0
-        | _ -> None
-
-let parseDigits pairOpt =
-    match (pairOpt |> Option.map (fun (f, l) -> (parseInt f, parseInt l))) with
-    | Some(Some first, Some last) -> Some((first, last))
+// Look for the first number from the start
+// Look for the first number from the end
+let extractDigitCharacters (line: string) =
+    let first = {0..(line.Length - 1)} |> findFirstDigit line
+    let last = {(line.Length - 1)..(-1)..0} |> findFirstDigit line
+    
+    match (first, last) with
+    | (Some f, Some l) -> Some(f, l)
     | _ -> None
-
+        
+ // The rest is the same
 let constructNumber pairOpt =
     pairOpt |> Option.map (fun (f, l) -> f * 10 + l)
 
@@ -37,7 +48,6 @@ Environment
     .GetCommandLineArgs()
     .[1].Split(Environment.NewLine, StringSplitOptions.TrimEntries ||| StringSplitOptions.RemoveEmptyEntries)
 |> Seq.map extractDigitCharacters // Extract digit substrings
-|> Seq.map parseDigits // Parse
 |> Seq.map constructNumber // Construct check sums
 |> Seq.fold // Compute sum if all check sums are Some, otherwise return None
     (fun sum lineCheckSum ->
