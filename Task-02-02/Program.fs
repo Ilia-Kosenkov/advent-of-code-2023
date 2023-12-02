@@ -1,20 +1,9 @@
 ﻿open System
 
-let hasEnough required recorded =
-    match recorded with
-    | Some has -> has <= required
-    | None -> true
-
 type GameSet =
     { RedCount: int option
       GreenCount: int option
       BlueCount: int option }
-
-    member this.HasEnoughRed(required: int) = hasEnough required this.RedCount
-
-    member this.HasEnoughGreen(required: int) = hasEnough required this.GreenCount
-
-    member this.HasEnoughBlue(required: int) = hasEnough required this.BlueCount
 
 type Game = { Id: int; GameSets: GameSet array }
 
@@ -92,23 +81,16 @@ let parseGame (line: string) =
                   GameSets = sets |> Array.ofList }
         | _ -> None
 
-let matchGame (game: Game) (requiredRed: int) (requiredGreen: int) (requiredBlue: int) =
-    if
-        Array.TrueForAll(
-            game.GameSets,
-            (fun gameSet ->
-                (gameSet.HasEnoughRed requiredRed)
-                && (gameSet.HasEnoughGreen requiredGreen)
-                && (gameSet.HasEnoughBlue requiredBlue))
-        )
-    then
-        Some(game.Id)
-    else
-        None
+let findMaxCubes game =
+    let redCount = game.GameSets |> Seq.choose (fun set -> set.RedCount) |> Seq.max
+    let greenCount = game.GameSets |> Seq.choose (fun set -> set.GreenCount) |> Seq.max
+    let blueCount = game.GameSets |> Seq.choose (fun set -> set.BlueCount) |> Seq.max
+
+    redCount * greenCount * blueCount
 
 Environment.GetCommandLineArgs().[1].Split(Environment.NewLine, splitOptions)
 |> Seq.map parseGame
 |> seqFold
-|> Option.map (List.choose (fun game -> matchGame game 12 13 14))
-|> Option.map List.sum
+|> Option.map (Seq.map findMaxCubes)
+|> Option.map Seq.sum
 |> printfn "%A"
