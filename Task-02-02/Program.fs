@@ -63,6 +63,15 @@ let parseGameSet (s: string) =
               BlueCount = None }
         ))
 
+let seqFold items =
+    items
+    |> Seq.fold
+        (fun (gameSets: 'a list option) (gameSet: 'a option) ->
+            match (gameSets, gameSet) with
+            | Some sets, Some set -> Some(List.append sets [ set ])
+            | _ -> None)
+        (Some [])
+
 let parseGame (line: string) =
     let indexOfColon = line.IndexOf(':')
 
@@ -74,12 +83,7 @@ let parseGame (line: string) =
         let gameSets =
             line.Substring(indexOfColon + 1).Split(';', splitOptions)
             |> Seq.map parseGameSet
-            |> Seq.fold
-                (fun (gameSets: GameSet list option) (gameSet: GameSet option) ->
-                    match (gameSets, gameSet) with
-                    | Some sets, Some set -> Some(List.append sets [ set ])
-                    | _ -> None)
-                (Some [])
+            |> seqFold
 
         match (gameId, gameSets) with
         | Some id, Some sets ->
@@ -103,12 +107,8 @@ let matchGame (game: Game) (requiredRed: int) (requiredGreen: int) (requiredBlue
         None
 
 Environment.GetCommandLineArgs().[1].Split(Environment.NewLine, splitOptions)
-|> Seq.fold
-    (fun list line ->
-        match (list, parseGame line) with
-        | Some list, Some game -> Some(List.append list [ game ])
-        | _ -> None)
-    (Some([]))
+|> Seq.map parseGame
+|> seqFold
 |> Option.map (List.choose (fun game -> matchGame game 12 13 14))
 |> Option.map List.sum
 |> printfn "%A"
