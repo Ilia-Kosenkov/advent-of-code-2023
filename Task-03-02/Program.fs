@@ -7,6 +7,13 @@ type DigitPosition =
     | Start of int
     | End of int
 
+let parseInt (s: ReadOnlySpan<char>) =
+    let mutable result = 0
+
+    match Int32.TryParse(s, &result) with
+    | true -> Some result
+    | false -> None
+
 type NumberPosition =
     { Start: int
       End: int }
@@ -14,6 +21,8 @@ type NumberPosition =
     member this.OverlapsWith(position: int) =
         (this.Start - 1) <= position && position <= this.End
 
+    member this.ParseInt(line: string) =
+        parseInt (line.AsSpan(this.Start, this.End - this.Start))
 
 type SymbolPosition = { Symbol: char; Position: int }
 
@@ -100,10 +109,13 @@ let getAdjacentNumbersHorizontal (lineInfo: LineInfo) (symbol: SymbolPosition) =
         yield! onTheLeft
         yield! onTheRight
     }
+    |> Seq.map (fun n -> n.ParseInt(lineInfo.Line))
 
 
 let getAdjacentNumbersVertical (lineInfo: LineInfo) (symbol: SymbolPosition) =
-    lineInfo.Numbers |> Seq.where (fun n -> n.OverlapsWith(symbol.Position))
+    lineInfo.Numbers
+    |> Seq.where (fun n -> n.OverlapsWith(symbol.Position))
+    |> Seq.map (fun n -> n.ParseInt(lineInfo.Line))
 
 let rec findGears (input: LineInfo array) =
     let previous = input[0]
@@ -115,22 +127,14 @@ let rec findGears (input: LineInfo array) =
     let partsCount =
         gearIndices
         |> Seq.map (fun g ->
-            (g,
-             seq {
-                 yield! getAdjacentNumbersVertical previous g
-                 yield! getAdjacentNumbersHorizontal current g
-                 yield! getAdjacentNumbersVertical next g
-             }))
+            seq {
+                yield! getAdjacentNumbersVertical previous g
+                yield! getAdjacentNumbersHorizontal current g
+                yield! getAdjacentNumbersVertical next g
+            }
+            |> seqFold)
 
-
-    (current, partsCount)
-
-let parseInt (s: ReadOnlySpan<char>) =
-    let mutable result = 0
-
-    match Int32.TryParse(s, &result) with
-    | true -> Some result
-    | false -> None
+    partsCount
 
 
 Environment.GetCommandLineArgs().[1].Split(Environment.NewLine, splitOptions)
@@ -146,5 +150,9 @@ Environment.GetCommandLineArgs().[1].Split(Environment.NewLine, splitOptions)
           Numbers = [||] } ])
 |> Option.map (Seq.windowed 3)
 |> Option.map (Seq.map findGears)
-|> Option.map Array.ofSeq
+|> Option.map Seq.concat
+|> Option.bind seqFold
+|> Option.map (Seq.where (fun l -> l.Length = 2))
+|> Option.map (Seq.map (fun l -> l[0] * l[1]))
+|> Option.map Seq.sum
 |> printfn "%A"
