@@ -60,7 +60,6 @@ type LineInfo =
 let processLine line =
     let symbolPositions = getSymbolPositions line
     let numberPositions = getNumberPositions line
-    numberPositions |> printfn "%A"
 
     match numberPositions with
     | Some(np) ->
@@ -142,4 +141,7 @@ Environment.GetCommandLineArgs().[1].Split(Environment.NewLine, splitOptions)
 |> Option.map (Seq.windowed 3)
 |> Option.map (Seq.map findPartNumbers)
 |> Option.map (Seq.map parsePartNumbers)
+|> Option.bind seqFold
+|> Option.map Seq.concat
+|> Option.map Seq.sum
 |> printfn "%A"
