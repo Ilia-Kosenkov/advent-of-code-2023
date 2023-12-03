@@ -82,24 +82,28 @@ let processLine line =
         )
     | _ -> None
 
-let seqAny sequence = sequence |> Seq.isEmpty |> not
-
-let countAdjacentNumbersHorizontal (lineInfo: LineInfo) (symbol: SymbolPosition) =
-    let hasOnTheLeft =
-        lineInfo.Numbers |> Seq.where (fun n -> n.End = symbol.Position) |> seqAny
-
-    let hasOnTheRight =
-        lineInfo.Numbers |> Seq.where (fun n -> n.Start = symbol.Position + 1) |> seqAny
-
-    match (hasOnTheLeft, hasOnTheRight) with
-    | (true, true) -> 2
-    | (false, false) -> 0
-    | _ -> 1
-
-let countAdjacentNumbersVertical (lineInfo: LineInfo) (symbol: SymbolPosition) =
+let findHorizontalPart (predicate: NumberPosition -> bool) (lineInfo: LineInfo) =
     lineInfo.Numbers
-    |> Seq.where (fun n -> n.OverlapsWith(symbol.Position))
-    |> Seq.length
+    |> Seq.where predicate
+    |> Seq.tryHead
+    |> Option.map Seq.singleton
+    |> Option.defaultValue Seq.empty
+
+
+let getAdjacentNumbersHorizontal (lineInfo: LineInfo) (symbol: SymbolPosition) =
+    let onTheLeft = lineInfo |> findHorizontalPart (fun n -> n.End = symbol.Position)
+
+    let onTheRight =
+        lineInfo |> findHorizontalPart (fun n -> n.Start = symbol.Position + 1)
+
+    seq {
+        yield! onTheLeft
+        yield! onTheRight
+    }
+
+
+let getAdjacentNumbersVertical (lineInfo: LineInfo) (symbol: SymbolPosition) =
+    lineInfo.Numbers |> Seq.where (fun n -> n.OverlapsWith(symbol.Position))
 
 let rec findGears (input: LineInfo array) =
     let previous = input[0]
@@ -112,9 +116,11 @@ let rec findGears (input: LineInfo array) =
         gearIndices
         |> Seq.map (fun g ->
             (g,
-             (countAdjacentNumbersHorizontal current g)
-             + (countAdjacentNumbersVertical previous g)
-             + (countAdjacentNumbersVertical next g)))
+             seq {
+                 yield! getAdjacentNumbersVertical previous g
+                 yield! getAdjacentNumbersHorizontal current g
+                 yield! getAdjacentNumbersVertical next g
+             }))
 
 
     (current, partsCount)
