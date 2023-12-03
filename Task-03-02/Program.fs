@@ -7,7 +7,15 @@ type DigitPosition =
     | Start of int
     | End of int
 
-type NumberPosition = { Start: int; End: int }
+type NumberPosition =
+    { Start: int
+      End: int }
+
+    member this.OverlapsWith(position: int) =
+        (this.Start - 1) <= position && position <= this.End
+
+
+type SymbolPosition = { Symbol: char; Position: int }
 
 let seqFold items =
     items
@@ -21,7 +29,11 @@ let seqFold items =
 let getSymbolPositions (line: string) =
     line
     |> Seq.indexed
-    |> Seq.choose (fun (i, c) -> if Char.IsDigit(c) || c = '.' then None else Some(i))
+    |> Seq.choose (fun (i, c) ->
+        if Char.IsDigit(c) || c = '.' then
+            None
+        else
+            Some({ Symbol = c; Position = i }))
     |> Array.ofSeq
 
 let prependAppend (prepend: 'a) (append: 'a) (items: 'a seq) =
@@ -53,7 +65,7 @@ let getNumberPositions (line: string) =
 
 type LineInfo =
     { Line: string
-      Symbols: int array
+      Symbols: SymbolPosition array
       Numbers: NumberPosition array }
 
 
@@ -70,49 +82,42 @@ let processLine line =
         )
     | _ -> None
 
-let hasHorizontalSymbols (input: LineInfo) =
-    input.Numbers
-    |> Seq.where (fun number ->
-        (input.Symbols |> Array.contains (number.Start - 1))
-        || input.Symbols |> Array.contains number.End)
+let seqAny sequence = sequence |> Seq.isEmpty |> not
 
+let countAdjacentNumbersHorizontal (lineInfo: LineInfo) (symbol: SymbolPosition) =
+    let hasOnTheLeft =
+        lineInfo.Numbers |> Seq.where (fun n -> n.End = symbol.Position) |> seqAny
 
-let hasVerticalSymbols (symbols: int array) (input: LineInfo) =
-    input.Numbers
-    |> Seq.where (fun number ->
-        symbols
-        |> Array.tryFind (fun symb -> symb >= number.Start - 1 && symb <= number.End)
-        |> Option.isSome)
+    let hasOnTheRight =
+        lineInfo.Numbers |> Seq.where (fun n -> n.Start = symbol.Position + 1) |> seqAny
 
-type Result =
-    { Line: string
-      PartNumbers: NumberPosition array }
+    match (hasOnTheLeft, hasOnTheRight) with
+    | (true, true) -> 2
+    | (false, false) -> 0
+    | _ -> 1
 
-let rec findPartNumbers (input: LineInfo array) =
+let countAdjacentNumbersVertical (lineInfo: LineInfo) (symbol: SymbolPosition) =
+    lineInfo.Numbers
+    |> Seq.where (fun n -> n.OverlapsWith(symbol.Position))
+    |> Seq.length
+
+let rec findGears (input: LineInfo array) =
     let previous = input[0]
     let current = input[1]
     let next = input[2]
 
-    let identifiedByHorizontalSymbols = current |> hasHorizontalSymbols |> Array.ofSeq
+    let gearIndices = current.Symbols |> Seq.where (fun s -> s.Symbol = '*')
 
-    let identifiedFromTop =
-        current |> (hasVerticalSymbols previous.Symbols) |> Array.ofSeq
+    let partsCount =
+        gearIndices
+        |> Seq.map (fun g ->
+            (g,
+             (countAdjacentNumbersHorizontal current g)
+             + (countAdjacentNumbersVertical previous g)
+             + (countAdjacentNumbersVertical next g)))
 
-    let identifiedFromBottom =
-        current |> (hasVerticalSymbols next.Symbols) |> Array.ofSeq
 
-    let partNumbers =
-        seq {
-            yield identifiedFromTop
-            yield identifiedByHorizontalSymbols
-            yield identifiedFromBottom
-        }
-        |> Seq.concat
-        |> Seq.distinct
-        |> Array.ofSeq
-
-    { Line = current.Line
-      PartNumbers = partNumbers }
+    (current, partsCount)
 
 let parseInt (s: ReadOnlySpan<char>) =
     let mutable result = 0
@@ -121,11 +126,6 @@ let parseInt (s: ReadOnlySpan<char>) =
     | true -> Some result
     | false -> None
 
-let parsePartNumbers (input: Result) =
-    input.PartNumbers
-    |> Seq.map (fun number -> parseInt (input.Line.AsSpan(number.Start, number.End - number.Start)))
-    |> seqFold
-    |> Option.map Array.ofSeq
 
 Environment.GetCommandLineArgs().[1].Split(Environment.NewLine, splitOptions)
 |> Array.map processLine
@@ -139,9 +139,6 @@ Environment.GetCommandLineArgs().[1].Split(Environment.NewLine, splitOptions)
           Symbols = [||]
           Numbers = [||] } ])
 |> Option.map (Seq.windowed 3)
-|> Option.map (Seq.map findPartNumbers)
-|> Option.map (Seq.map parsePartNumbers)
-|> Option.bind seqFold
-|> Option.map Seq.concat
-|> Option.map Seq.sum
+|> Option.map (Seq.map findGears)
+|> Option.map Array.ofSeq
 |> printfn "%A"
