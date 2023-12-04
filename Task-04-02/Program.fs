@@ -1,4 +1,5 @@
 ﻿open System
+open Microsoft.FSharp.Collections
 
 let splitOptions =
     StringSplitOptions.TrimEntries ||| StringSplitOptions.RemoveEmptyEntries
@@ -8,10 +9,17 @@ type Card =
       WinningNumbers: int array
       CardNumbers: int array }
 
-    member this.GetScores() =
-        this.WinningNumbers
-        |> Set.ofArray
-        |> Set.intersect (this.CardNumbers |> Set.ofArray)
+    member this.GetNextCardIds() =
+        let scores =
+            this.WinningNumbers
+            |> Set.ofArray
+            |> Set.intersect (this.CardNumbers |> Set.ofArray)
+            |> Seq.length
+
+        seq {
+            for i in 1..scores do
+                yield this.Id + i
+        }
 
 let parseInt (s: ReadOnlySpan<char>) =
     let mutable result = 0
@@ -62,11 +70,28 @@ let parseCard (line: string) =
         |> Option.map (fun cardNumbers -> { card with CardNumbers = cardNumbers }))
 
 
+type CardSet = { Id: int; NextCards: int array }
+
+let mergeSets (old: CardSet) (newItem: CardSet) =
+    let count = old.NextCards |> Seq.where (fun i -> i = newItem.Id) |> Seq.length
+
+    let newCards =
+        Seq.replicate (count + 1) (seq { yield! newItem.NextCards }) |> Seq.concat
+
+    { Id = 0
+      NextCards = [| yield! old.NextCards; yield newItem.Id; yield! newCards |] }
 
 Environment.GetCommandLineArgs().[1].Split(Environment.NewLine, splitOptions)
 |> Seq.map parseCard
 |> seqFold
-|> Option.map (List.map (fun card -> card.GetScores()))
-|> Option.map (List.map (fun scores -> pown 2 (scores.Count - 1)))
-|> Option.map List.sum
+|> Option.map (
+    Seq.map (fun card ->
+        { Id = card.Id
+          NextCards = card.GetNextCardIds() |> Array.ofSeq })
+)
+|> Option.map Array.ofSeq
+|> Option.map (Seq.fold mergeSets { Id = 0; NextCards = [||] })
+|> Option.map (fun set -> set.NextCards.Length)
+// |> Option.map (fun set ->
+//     (set.NextCards |> Array.groupBy id |> Array.map (fun (x, s) -> (x, s.Length)), set.NextCards.Length))
 |> printfn "%A"
