@@ -29,6 +29,7 @@ Here `Task` is the task number (equal to the day), `Part` is either `1` or `2`, 
   - [Second task](Task-03-02)
 - Day 4
   - [First task](Task-04-01)
+  - [Second task](Task-04-02)
 
 ## Lessons learned (Warning: spoilers ahead)
 
