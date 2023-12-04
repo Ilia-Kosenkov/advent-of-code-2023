@@ -8,6 +8,11 @@ type Card =
       WinningNumbers: int array
       CardNumbers: int array }
 
+    member this.GetScores() =
+        this.WinningNumbers
+        |> Set.ofArray
+        |> Set.intersect (this.CardNumbers |> Set.ofArray)
+
 let parseInt (s: ReadOnlySpan<char>) =
     let mutable result = 0
 
@@ -61,4 +66,7 @@ let parseCard (line: string) =
 Environment.GetCommandLineArgs().[1].Split(Environment.NewLine, splitOptions)
 |> Seq.map parseCard
 |> seqFold
+|> Option.map (List.map (fun card -> card.GetScores()))
+|> Option.map (List.map (fun scores -> pown 2 (scores.Count - 1)))
+|> Option.map List.sum
 |> printfn "%A"
