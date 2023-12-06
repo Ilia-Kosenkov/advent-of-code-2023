@@ -14,10 +14,21 @@ type Range =
 
 type MapHeader = { From: string; To: string }
 
+type Mapping =
+    { Header: MapHeader; Items: Range list }
+
+type Seeds = int array
+
 type Input =
-    | Seeds of int array
+    | Seeds of Seeds
     | MapHeader of MapHeader
     | MapItem of SpecificRange
+
+
+type ParsedInput =
+    | Seeds of Seeds
+    | Mapping of Mapping array
+
 
 let parseInt (s: string) =
     let mutable result = 0
@@ -26,7 +37,7 @@ let parseInt (s: string) =
     | true -> Some result
     | false -> None
 
-let seqFoldToArray items =
+let seqFold items =
     items
     |> Seq.fold
         (fun (gameSets: 'a list option) (gameSet: 'a option) ->
@@ -34,7 +45,10 @@ let seqFoldToArray items =
             | Some sets, Some set -> Some(List.append sets [ set ])
             | _ -> None)
         (Some [])
-    |> Option.map Array.ofList
+
+
+let seqFoldToArray items =
+    items |> seqFold |> Option.map Array.ofList
 
 
 let rec parseInput (lines: string seq) =
@@ -45,7 +59,7 @@ let rec parseInput (lines: string seq) =
                     line.Substring(6).Split(' ', splitOptions)
                     |> Array.map parseInt
                     |> seqFoldToArray
-                    |> Option.map Seeds
+                    |> Option.map Input.Seeds
             elif line.EndsWith("map:") then
                 yield
                     match line.Substring(0, line.Length - 5).Split("-to-", splitOptions) with
@@ -66,7 +80,42 @@ let rec parseInput (lines: string seq) =
                     | _ -> None
     }
 
+let gatherMaps (input: Input list) =
+    input
+    |> Seq.fold
+        (fun (maps: Mapping list option) (item: Input) ->
+            match (maps, item) with
+            | Some maps, MapHeader header -> Some({ Header = header; Items = [] } :: maps)
+            | Some maps, MapItem item ->
+                match maps with
+                | head :: tail ->
+                    Some(
+                        { head with
+                            Items = head.Items @ [ SpecificRange item ] }
+                        :: tail
+                    )
+                | _ -> None
+            | _ -> None)
+        (Some([]))
+    |> Option.map (
+        List.map (fun map ->
+            { map with
+                Items = map.Items @ [ AllRange ] })
+    )
+    |> Option.map List.rev
+
+
+let gatherInput (input: Input list) =
+    match input with
+    | Input.Seeds head :: tail ->
+        match gatherMaps tail with
+        | Some maps -> Some(head, maps)
+        | _ -> None
+    | _ -> None
 
 Environment.GetCommandLineArgs().[1].Split(Environment.NewLine, splitOptions)
 |> parseInput
+|> seqFold
+|> Option.bind gatherInput
+|> Option.map (fun (seeds, maps) -> (seeds, maps |> List.map (fun map -> (map.Header.From, map)) |> Map.ofList))
 |> printfn "%A"
