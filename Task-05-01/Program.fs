@@ -12,7 +12,21 @@ type Range =
     | SpecificRange of SpecificRange
     | AllRange
 
+type Range with
+
+    member this.Map(value: int) =
+        match this with
+        | SpecificRange { KeyStart = keyStart
+                          ValueStart = valueStart
+                          Length = length } ->
+            if value >= keyStart && value < keyStart + length then
+                Some(valueStart + value - keyStart)
+            else
+                None
+        | AllRange -> Some(value)
+
 type MapHeader = { From: string; To: string }
+
 
 type Mapping =
     { Header: MapHeader; Items: Range list }
@@ -73,8 +87,8 @@ let rec parseInput (lines: string seq) =
                     | Some(numbers) when numbers.Length = 3 ->
                         Some(
                             MapItem
-                                { KeyStart = numbers[0]
-                                  ValueStart = numbers[1]
+                                { KeyStart = numbers[1]
+                                  ValueStart = numbers[0]
                                   Length = numbers[2] }
                         )
                     | _ -> None
@@ -113,9 +127,32 @@ let gatherInput (input: Input list) =
         | _ -> None
     | _ -> None
 
+let findSeeds ((seeds, maps): int array * Map<string, Mapping>) =
+    let startName = "seed"
+    let lastName = "location"
+
+    seq {
+        let mutable name = startName
+        let mutable input = seeds
+
+        while name <> lastName do
+            let map = maps[name]
+
+            input <-
+                input
+                |> Array.map (fun value -> (map.Items |> Seq.choose (fun range -> range.Map(value)) |> Seq.head))
+
+            name <- map.Header.To
+
+        input
+    }
+
+
+
 Environment.GetCommandLineArgs().[1].Split(Environment.NewLine, splitOptions)
 |> parseInput
 |> seqFold
 |> Option.bind gatherInput
 |> Option.map (fun (seeds, maps) -> (seeds, maps |> List.map (fun map -> (map.Header.From, map)) |> Map.ofList))
+|> Option.map findSeeds
 |> printfn "%A"
