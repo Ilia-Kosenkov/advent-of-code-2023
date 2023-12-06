@@ -4,9 +4,9 @@ let splitOptions =
     StringSplitOptions.TrimEntries ||| StringSplitOptions.RemoveEmptyEntries
 
 type SpecificRange =
-    { KeyStart: int
-      ValueStart: int
-      Length: int }
+    { KeyStart: int64
+      ValueStart: int64
+      Length: int64 }
 
 type Range =
     | SpecificRange of SpecificRange
@@ -14,7 +14,7 @@ type Range =
 
 type Range with
 
-    member this.Map(value: int) =
+    member this.Map(value: int64) =
         match this with
         | SpecificRange { KeyStart = keyStart
                           ValueStart = valueStart
@@ -31,7 +31,7 @@ type MapHeader = { From: string; To: string }
 type Mapping =
     { Header: MapHeader; Items: Range list }
 
-type Seeds = int array
+type Seeds = int64 array
 
 type Input =
     | Seeds of Seeds
@@ -45,9 +45,9 @@ type ParsedInput =
 
 
 let parseInt (s: string) =
-    let mutable result = 0
+    let mutable result = 0L
 
-    match Int32.TryParse(s, &result) with
+    match Int64.TryParse(s, &result) with
     | true -> Some result
     | false -> None
 
@@ -127,25 +127,23 @@ let gatherInput (input: Input list) =
         | _ -> None
     | _ -> None
 
-let findSeeds ((seeds, maps): int array * Map<string, Mapping>) =
+let findSeeds ((seeds, maps): int64 array * Map<string, Mapping>) =
     let startName = "seed"
     let lastName = "location"
 
-    seq {
-        let mutable name = startName
-        let mutable input = seeds
+    let mutable name = startName
+    let mutable input = seeds
 
-        while name <> lastName do
-            let map = maps[name]
+    while name <> lastName do
+        let map = maps[name]
 
-            input <-
-                input
-                |> Array.map (fun value -> (map.Items |> Seq.choose (fun range -> range.Map(value)) |> Seq.head))
+        input <-
+            input
+            |> Array.map (fun value -> (map.Items |> Seq.choose (fun range -> range.Map(value)) |> Seq.head))
 
-            name <- map.Header.To
+        name <- map.Header.To
 
-        input
-    }
+    input
 
 
 
@@ -155,4 +153,5 @@ Environment.GetCommandLineArgs().[1].Split(Environment.NewLine, splitOptions)
 |> Option.bind gatherInput
 |> Option.map (fun (seeds, maps) -> (seeds, maps |> List.map (fun map -> (map.Header.From, map)) |> Map.ofList))
 |> Option.map findSeeds
+|> Option.map Array.min
 |> printfn "%A"
