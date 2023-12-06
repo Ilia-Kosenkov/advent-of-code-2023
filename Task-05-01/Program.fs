@@ -12,16 +12,14 @@ type Range =
     | SpecificRange of SpecificRange
     | AllRange
 
-type InputMap =
-    { From: string
-      To: String
-      Map: Range array }
+type MapHeader = { From: string; To: string }
 
 type Input =
     | Seeds of int array
-    | InputMap of InputMap
+    | MapHeader of MapHeader
+    | MapItem of SpecificRange
 
-let parseInt (s: ReadOnlySpan<char>) =
+let parseInt (s: string) =
     let mutable result = 0
 
     match Int32.TryParse(s, &result) with
@@ -45,10 +43,27 @@ let rec parseInput (lines: string seq) =
             if line.StartsWith("seeds:") then
                 yield
                     line.Substring(6).Split(' ', splitOptions)
-                    |> Array.map (fun num -> parseInt (num.AsSpan()))
+                    |> Array.map parseInt
                     |> seqFoldToArray
                     |> Option.map Seeds
+            elif line.EndsWith("map:") then
+                yield
+                    match line.Substring(0, line.Length - 5).Split("-to-", splitOptions) with
+                    | [| from; to_ |] -> Some(MapHeader { From = from; To = to_ })
+                    | _ -> None
+            else
+                let numbers = line.Split(' ', splitOptions) |> Array.map parseInt |> seqFoldToArray
 
+                yield
+                    match numbers with
+                    | Some(numbers) when numbers.Length = 3 ->
+                        Some(
+                            MapItem
+                                { KeyStart = numbers[0]
+                                  ValueStart = numbers[1]
+                                  Length = numbers[2] }
+                        )
+                    | _ -> None
     }
 
 
